@@ -2,39 +2,53 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Request;
 
 class GeoLocationService
 {
+    // Approximate bounding box for Lagos State, Nigeria. A rectangle is a
+    // coarse approximation of the state's actual shape (it can include a
+    // sliver of neighbouring Ogun State at the edges), but GPS coordinates
+    // checked against it are far more trustworthy than an IP-based lookup,
+    // which doesn't reflect a device's real physical position at all.
+    private const LAGOS_MIN_LAT = 6.3529;
+
+    private const LAGOS_MAX_LAT = 6.7027;
+
+    private const LAGOS_MIN_LNG = 2.7005;
+
+    private const LAGOS_MAX_LNG = 4.3174;
+
     /**
-     * Resolve an IP to a country code + region name.
-     * Returns null when the IP can't be geolocated (private/loopback IP,
-     * or the lookup provider failed) so callers can decide how to treat that.
+     * Single source of truth for "is this request eligible to report from
+     * Lagos, Nigeria" — used by both the enforcing middleware and the
+     * informational eligibility endpoint, so the two can never disagree.
      *
-     * @return array{country_code: string, region: string}|null
+     * GPS coordinates are mandatory — there is no IP-based fallback. If the
+     * browser hasn't supplied a device location, the request is ineligible.
+     *
+     * @return array{eligible: bool, message: ?string}
      */
-    public function locate(string $ip): ?array
+    public function evaluate(Request $request): array
     {
-        if ($this->isPrivateOrReservedIp($ip)) {
-            return null;
+        $lat = $request->input('gps_latitude');
+        $lng = $request->input('gps_longitude');
+
+        if (! is_numeric($lat) || ! is_numeric($lng)) {
+            return [
+                'eligible' => false,
+                'message' => 'Location access is required to report an issue.',
+            ];
         }
 
-        $response = Http::timeout(3)->get("http://ip-api.com/json/{$ip}", [
-            'fields' => 'status,countryCode,regionName',
-        ]);
-
-        if (! $response->ok() || $response->json('status') !== 'success') {
-            return null;
-        }
-
-        return [
-            'country_code' => $response->json('countryCode'),
-            'region' => $response->json('regionName'),
-        ];
+        return $this->isWithinLagos((float) $lat, (float) $lng)
+            ? ['eligible' => true, 'message' => null]
+            : ['eligible' => false, 'message' => 'Reporting is only available to users within Lagos State.'];
     }
 
-    private function isPrivateOrReservedIp(string $ip): bool
+    public function isWithinLagos(float $latitude, float $longitude): bool
     {
-        return ! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+        return $latitude >= self::LAGOS_MIN_LAT && $latitude <= self::LAGOS_MAX_LAT
+            && $longitude >= self::LAGOS_MIN_LNG && $longitude <= self::LAGOS_MAX_LNG;
     }
 }

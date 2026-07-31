@@ -35,6 +35,8 @@ class StoreReportRequest extends FormRequest
             'photos' => ['nullable', 'array', 'max:5'],
             'photos.*' => ['image', 'mimes:jpg,jpeg,png', 'max:5120'],
             'recaptcha_token' => ['required', 'string'],
+            'gps_latitude' => ['required', 'numeric', 'between:-90,90'],
+            'gps_longitude' => ['required', 'numeric', 'between:-180,180'],
         ];
     }
 }

@@ -20,32 +20,7 @@ class ReportController extends Controller
 
     public function eligibility(Request $request): JsonResponse
     {
-        $location = $this->geoLocationService->locate($request->ip());
-
-        if (! $location) {
-            $eligible = app()->environment(['local', 'testing']);
-
-            return response()->json([
-                'eligible' => $eligible,
-                'message' => $eligible ? null : 'We could not verify your location.',
-            ]);
-        }
-
-        if ($location['country_code'] !== 'NG') {
-            return response()->json([
-                'eligible' => false,
-                'message' => 'Reporting is only available to users within Nigeria.',
-            ]);
-        }
-
-        if ($location['region'] !== 'Lagos') {
-            return response()->json([
-                'eligible' => false,
-                'message' => 'Reporting is only available to users within Lagos State.',
-            ]);
-        }
-
-        return response()->json(['eligible' => true, 'message' => null]);
+        return response()->json($this->geoLocationService->evaluate($request));
     }
 
     public function store(StoreReportRequest $request): JsonResponse
@@ -57,7 +32,7 @@ class ReportController extends Controller
         }
 
         $report = $this->reportService->create(
-            $request->safe()->except(['photos', 'recaptcha_token']),
+            $request->safe()->except(['photos', 'recaptcha_token', 'gps_latitude', 'gps_longitude']),
             $request->file('photos', []),
         );
 
