@@ -32,7 +32,7 @@ class StoreReportRequest extends FormRequest
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'description' => ['required', 'string', 'max:2000'],
-            'photos' => ['nullable', 'array', 'max:5'],
+            'photos' => ['required', 'array', 'min:1', 'max:5'],
             'photos.*' => ['image', 'mimes:jpg,jpeg,png', 'max:5120'],
             'recaptcha_token' => ['required', 'string'],
             'gps_latitude' => ['required', 'numeric', 'between:-90,90'],

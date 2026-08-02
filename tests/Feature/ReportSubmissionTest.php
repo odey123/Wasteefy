@@ -7,6 +7,7 @@ use App\Mail\ReportSubmittedMail;
 use App\Models\Report;
 use App\Models\ReportType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
@@ -38,6 +39,7 @@ class ReportSubmissionTest extends TestCase
             'recaptcha_token' => 'test-token',
             'gps_latitude' => 6.5244,
             'gps_longitude' => 3.3792,
+            'photos' => [UploadedFile::fake()->image('dumping.jpg')],
         ]);
 
         $response->assertStatus(201)->assertJsonStructure(['reference', 'message']);
@@ -45,8 +47,40 @@ class ReportSubmissionTest extends TestCase
         $report = Report::where('reference', $response->json('reference'))->firstOrFail();
 
         $this->assertSame(ReportStatus::Submitted, $report->status);
+        $this->assertCount(1, $report->photos);
 
         Mail::assertQueued(ReportSubmittedMail::class);
+    }
+
+    public function test_submission_is_rejected_without_a_photo(): void
+    {
+        Mail::fake();
+        Http::fake([
+            'https://www.google.com/recaptcha/api/siteverify' => Http::response(['success' => true]),
+        ]);
+
+        $reportType = ReportType::create([
+            'name' => 'Illegal Dumping',
+            'slug' => 'illegal-dumping',
+        ]);
+
+        $response = $this->postJson('/api/reports', [
+            'report_type_id' => $reportType->id,
+            'email' => 'reporter5@example.com',
+            'phone_number' => '08012345678',
+            'address' => '5 Lightwork street, Ikeja',
+            'city' => 'Ikeja',
+            'state' => 'Lagos',
+            'description' => 'No photo attached to this submission.',
+            'recaptcha_token' => 'test-token',
+            'gps_latitude' => 6.5244,
+            'gps_longitude' => 3.3792,
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors(['photos']);
+
+        $this->assertDatabaseCount('reports', 0);
+        Mail::assertNothingQueued();
     }
 
     public function test_submission_is_rejected_when_recaptcha_fails(): void
