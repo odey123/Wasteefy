@@ -29,8 +29,6 @@ class StoreReportRequest extends FormRequest
             'address' => ['required', 'string', 'max:255'],
             'city' => ['required', 'string', 'max:255'],
             'state' => ['required', 'string', 'max:255'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'description' => ['required', 'string', 'max:2000'],
             'photos' => ['required', 'array', 'min:1', 'max:5'],
             'photos.*' => ['image', 'mimes:jpg,jpeg,png', 'max:5120'],

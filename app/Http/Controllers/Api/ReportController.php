@@ -31,10 +31,11 @@ class ReportController extends Controller
             ], 422);
         }
 
-        $report = $this->reportService->create(
-            $request->safe()->except(['photos', 'recaptcha_token', 'gps_latitude', 'gps_longitude']),
-            $request->file('photos', []),
-        );
+        $data = $request->safe()->except(['photos', 'recaptcha_token', 'gps_latitude', 'gps_longitude']);
+        $data['latitude'] = $request->validated('gps_latitude');
+        $data['longitude'] = $request->validated('gps_longitude');
+
+        $report = $this->reportService->create($data, $request->file('photos', []));
 
         return response()->json([
             'reference' => $report->reference,

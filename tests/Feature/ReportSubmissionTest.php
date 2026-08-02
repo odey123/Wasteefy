@@ -48,6 +48,8 @@ class ReportSubmissionTest extends TestCase
 
         $this->assertSame(ReportStatus::Submitted, $report->status);
         $this->assertCount(1, $report->photos);
+        $this->assertEquals(6.5244, (float) $report->latitude);
+        $this->assertEquals(3.3792, (float) $report->longitude);
 
         Mail::assertQueued(ReportSubmittedMail::class);
     }
