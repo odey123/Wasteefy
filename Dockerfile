@@ -5,6 +5,14 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-install pdo pdo_pgsql pdo_mysql zip gd \
     && rm -rf /var/lib/apt/lists/*
 
+# Default PHP upload limits (2M/8M) are too small for real phone photos.
+# Allows up to 5 photos at 5MB each (our validation cap), plus headroom for
+# the rest of the form fields in the same multipart request.
+RUN { \
+        echo "upload_max_filesize=8M"; \
+        echo "post_max_size=32M"; \
+    } > "$PHP_INI_DIR/conf.d/uploads.ini"
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
