@@ -176,4 +176,69 @@ class ReportSubmissionTest extends TestCase
         $this->assertDatabaseCount('reports', 0);
         Mail::assertNothingQueued();
     }
+
+    public function test_ip_eligibility_passes_for_a_nigerian_ip(): void
+    {
+        Http::fake([
+            'http://ip-api.com/*' => Http::response(['status' => 'success', 'countryCode' => 'NG']),
+        ]);
+
+        $response = $this->withServerVariables(['REMOTE_ADDR' => '105.112.0.1'])
+            ->getJson('/api/reports/ip-eligibility');
+
+        $response->assertOk()->assertJson(['eligible' => true, 'message' => null]);
+    }
+
+    public function test_ip_eligibility_fails_for_a_non_nigerian_ip(): void
+    {
+        Http::fake([
+            'http://ip-api.com/*' => Http::response(['status' => 'success', 'countryCode' => 'US']),
+        ]);
+
+        $response = $this->withServerVariables(['REMOTE_ADDR' => '8.8.8.8'])
+            ->getJson('/api/reports/ip-eligibility');
+
+        $response->assertOk()->assertJson([
+            'eligible' => false,
+            'message' => 'Reporting is only available to users within Nigeria.',
+        ]);
+    }
+
+    public function test_submission_is_rejected_when_ip_is_outside_nigeria_even_with_valid_lagos_gps(): void
+    {
+        Mail::fake();
+        Http::fake([
+            'http://ip-api.com/*' => Http::response(['status' => 'success', 'countryCode' => 'US']),
+            'https://www.google.com/recaptcha/api/siteverify' => Http::response(['success' => true]),
+        ]);
+
+        $reportType = ReportType::create([
+            'name' => 'Overflowing Bin',
+            'slug' => 'overflowing-bin',
+        ]);
+
+        $response = $this->withServerVariables(['REMOTE_ADDR' => '8.8.8.8'])
+            ->postJson('/api/reports', [
+                'report_type_id' => $reportType->id,
+                'email' => 'reporter6@example.com',
+                'phone_number' => '08012345678',
+                'address' => '6 Lightwork street, Ikeja',
+                'city' => 'Ikeja',
+                'state' => 'Lagos',
+                'description' => 'Foreign IP but spoofed Lagos GPS.',
+                'recaptcha_token' => 'test-token',
+                'gps_latitude' => 6.5244,
+                'gps_longitude' => 3.3792,
+                'photos' => [UploadedFile::fake()->image('dumping.jpg')],
+            ]);
+
+        // The IP check runs before the GPS check, so this is blocked even
+        // though the GPS coordinates alone would have passed.
+        $response->assertStatus(403)->assertJson([
+            'message' => 'Reporting is only available to users within Nigeria.',
+        ]);
+
+        $this->assertDatabaseCount('reports', 0);
+        Mail::assertNothingQueued();
+    }
 }

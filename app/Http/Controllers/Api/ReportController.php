@@ -18,6 +18,11 @@ class ReportController extends Controller
         private readonly RecaptchaService $recaptchaService,
     ) {}
 
+    public function ipEligibility(Request $request): JsonResponse
+    {
+        return response()->json($this->geoLocationService->evaluateIp($request));
+    }
+
     public function eligibility(Request $request): JsonResponse
     {
         return response()->json($this->geoLocationService->evaluate($request));

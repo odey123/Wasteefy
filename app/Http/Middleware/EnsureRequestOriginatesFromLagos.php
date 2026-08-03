@@ -15,10 +15,16 @@ class EnsureRequestOriginatesFromLagos
 
     public function handle(Request $request, Closure $next): Response
     {
-        $result = $this->geoLocationService->evaluate($request);
+        $ipResult = $this->geoLocationService->evaluateIp($request);
 
-        if (! $result['eligible']) {
-            return response()->json(['message' => $result['message']], 403);
+        if (! $ipResult['eligible']) {
+            return response()->json(['message' => $ipResult['message']], 403);
+        }
+
+        $gpsResult = $this->geoLocationService->evaluate($request);
+
+        if (! $gpsResult['eligible']) {
+            return response()->json(['message' => $gpsResult['message']], 403);
         }
 
         return $next($request);

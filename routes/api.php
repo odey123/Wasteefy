@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Admin\ReportTypeController;
 use App\Http\Controllers\Api\ReportController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('reports/ip-eligibility', [ReportController::class, 'ipEligibility']);
 Route::get('reports/eligibility', [ReportController::class, 'eligibility']);
 
 Route::post('reports', [ReportController::class, 'store'])
