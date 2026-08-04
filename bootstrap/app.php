@@ -14,6 +14,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Render (like Heroku/Railway) sits in front of the app as the only
+        // way in - it's not an untrusted network hop, so trusting it here
+        // is safe. Without this, $request->ip() returns Render's internal
+        // routing IP instead of the real visitor IP, which breaks both the
+        // IP-based Nigeria check and per-visitor rate limiting.
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'lagos.only' => EnsureRequestOriginatesFromLagos::class,
         ]);
