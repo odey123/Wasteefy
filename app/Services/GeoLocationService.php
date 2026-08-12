@@ -7,18 +7,15 @@ use Illuminate\Support\Facades\Http;
 
 class GeoLocationService
 {
-    // Approximate bounding box for Lagos State, Nigeria. A rectangle is a
-    // coarse approximation of the state's actual shape (it can include a
-    // sliver of neighbouring Ogun State at the edges), but GPS coordinates
-    // checked against it are far more trustworthy than an IP-based lookup,
-    // which doesn't reflect a device's real physical position at all.
-    private const LAGOS_MIN_LAT = 6.3529;
-
-    private const LAGOS_MAX_LAT = 6.7027;
-
-    private const LAGOS_MIN_LNG = 2.7005;
-
-    private const LAGOS_MAX_LNG = 4.3174;
+    /**
+     * The real, traced boundary of Lagos State (as opposed to a rectangular
+     * approximation), loaded once per request. Array of [longitude, latitude]
+     * pairs. Source: resources/geo/lagos-boundary.json (OpenStreetMap
+     * Nominatim administrative boundary data).
+     *
+     * @var array<int, array{0: float, 1: float}>|null
+     */
+    private static ?array $lagosBoundaryRing = null;
 
     /**
      * Cheap first filter: is this request even coming from Nigeria, based on
@@ -84,10 +81,44 @@ class GeoLocationService
             : ['eligible' => false, 'message' => 'Reporting is only available to users within Lagos State.'];
     }
 
+    /**
+     * Checks a coordinate against Lagos State's real, traced boundary using
+     * a point-in-polygon (ray casting) test — accurate to the state's actual
+     * irregular shape, unlike a bounding-box rectangle which would wrongly
+     * include nearby Ogun State towns like Ota at the border.
+     */
     public function isWithinLagos(float $latitude, float $longitude): bool
     {
-        return $latitude >= self::LAGOS_MIN_LAT && $latitude <= self::LAGOS_MAX_LAT
-            && $longitude >= self::LAGOS_MIN_LNG && $longitude <= self::LAGOS_MAX_LNG;
+        $ring = $this->lagosBoundaryRing();
+        $inside = false;
+        $count = count($ring);
+
+        for ($i = 0, $j = $count - 1; $i < $count; $j = $i++) {
+            [$xi, $yi] = $ring[$i]; // longitude, latitude
+            [$xj, $yj] = $ring[$j];
+
+            $intersects = (($yi > $latitude) !== ($yj > $latitude))
+                && ($longitude < ($xj - $xi) * ($latitude - $yi) / ($yj - $yi) + $xi);
+
+            if ($intersects) {
+                $inside = ! $inside;
+            }
+        }
+
+        return $inside;
+    }
+
+    /**
+     * @return array<int, array{0: float, 1: float}>
+     */
+    private function lagosBoundaryRing(): array
+    {
+        if (self::$lagosBoundaryRing === null) {
+            $data = json_decode(file_get_contents(resource_path('geo/lagos-boundary.json')), true);
+            self::$lagosBoundaryRing = $data['ring'];
+        }
+
+        return self::$lagosBoundaryRing;
     }
 
     private function isPrivateOrReservedIp(string $ip): bool
